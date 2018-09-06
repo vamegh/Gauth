@@ -1,0 +1,18 @@
+---
+## Central Yaml Config file
+# This pulls in all of the various config elements to create a unified data dictionary used within this tool
+
+config_path: '/etc/gauth'
+temp_path: '/tmp/gauth'
+
+## logging
+## can be debug, info, warning, error or critical
+logging_config:
+  log_level: "info"
+  log_file: '/var/log/gauth/injector.log'
+  log_file_level: 'info'
+
+# The various generic config files, required to make most of the libs work correctly
+color_map: '/etc/gauth/color_map.yaml'
+git_config: '/etc/gauth/git_config.yaml'
+
