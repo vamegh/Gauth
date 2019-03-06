@@ -16,7 +16,8 @@
 
 from optparse import OptionParser
 import sys
-import yaml
+from file_handler import FileHandler as file_handler
+
 
 class Commands(object):
     def __init__(self, name='', version='0.0.1', message=''):
@@ -33,29 +34,29 @@ class Commands(object):
         self.parser.add_option('-c', '--config', action='store', default='/etc/gauth/config.yaml',
                                help=' '.join(['Provide a custom configuration file,',
                                               'defaults to /etc/gauth/config.yaml if none provided']))
-        self.parser.add_option('-d', '--data_file', action='append', default=None,
-                               help=' '.join(['Provide data files to import (optional)',
-                                              'this can be called multiple times to import multiple files,',
-                                              'This is the data to import into gauth example:',
-                                              '-D <path>/data1.yaml -D <path>/data2.json -D <path>/data3.yaml etc.']))
-        self.parser.add_option('--force', action='store_true',
-                               dest='force', default=False,
-                               help='Force running script (if you must run as root)- use with care')
-
-    def add_git(self):
-        self.parser.add_option('-b', '--branch', action='store', default=None,
-                               help=' '.join(['Provide a custom git branch to use, defaults to',
-                                              'branch specified in config file or master if none provided']))
 
     def add_debug(self):
         self.parser.add_option('-D', '--debug', action='store', type='int', default=None,
                                help=' '.join(['set debugging level: ',
                                               'an integer value between 1 to 5 (the higher the more',
                                               'debugging output that will be provided)']))
+    def add_ldap(self):
+        self.parser.add_option('-u', '--user_name', action='store', type='int', default=None,
+                               help=' '.join(['The username or user id for the user to create the token,',
+                                              'if this is not specified the username, will be gathered from env.'
+                                              'Default: None']))
+
+    def add_logging(self):
+        self.parser.add_option('--log_file', action='store',
+                               default=("/var/log/%s/%s.log" % (self.name, self.version)),
+                               help=' '.join(['File to Log script run information',
+                                              ', by default this is ',
+                                              '/var/log/<name>/<name>_<version>_<date>.log (optional)']))
 
     def set_options(self):
         options, args = self.parser.parse_args()
         return options, args, self.parser
+
 
 class CommandCheck(object):
     def __init__(self, options=None, parser=None):
@@ -63,36 +64,15 @@ class CommandCheck(object):
         self.parser = parser
 
     def config(self):
-        '''check the default options'''
         if self.options.config:
             try:
-                with open(self.options.config, "r") as configyml:
-                    config_data = yaml.safe_load(configyml)
-                    return config_data
-            except IOError as e:
-                print ("\nConfig File Issue: %s :: Error : %s\n" % (self.options.config, e[1]))
+                config_data = file_handler.read_file(config_file=self.options.config)
+                return config_data
+            except (IOError, ValueError) as err:
+                print ("\nConfig File Issue: %s :: Error : %s\n" % (self.options.config, err))
                 self.parser.print_help()
                 sys.exit(1)
 
     def debug(self):
         if self.options.debug:
             print("Setting log level to match debug level")
-
-    def query(self):
-        try:
-            if not self.options.query:
-                self.parser.error("Query is Required")
-        except AttributeError:
-            self.parser.error("Query is Required")
-
-    def format(self):
-        valid_formats = ['json', 'yaml']
-        try:
-          if self.options.format not in valid_formats:
-              self.parser.error("Format must be either json or yaml")
-        except AttributeError:
-            self.options.format = 'json'
-
-
-
-

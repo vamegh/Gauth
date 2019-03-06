@@ -14,8 +14,8 @@
 ##
 #
 
+import logging, sys, os
 from datetime import datetime
-import ctypes, logging, sys, os
 
 
 def color_map(color='', c_map={}):
@@ -141,7 +141,8 @@ class CustomLog(logging.Formatter):
             try:
                 logfile = self.logging_config['log_file']
                 log_path, log_file = os.path.split(logfile)
-                log_file = name + '-' + log_file
+                time_stamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M")
+                log_file = time_stamp + '_' + name + '_' + log_file
                 logfile = os.path.join(log_path, log_file)
                 if not os.path.exists(log_path):
                     os.makedirs(log_path)
@@ -195,8 +196,8 @@ class CustomLog(logging.Formatter):
             try:
                 logfile = logging_config['log_file']
                 log_path, log_file = os.path.split(logfile)
-                time_stamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M:%S")
-                log_file = name + '_' + time_stamp + '_' + log_file
+                time_stamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M")
+                log_file = time_stamp + '_' + name + '_' + log_file
                 logfile = os.path.join(log_path, log_file)
                 if not os.path.exists(log_path):
                     os.makedirs(log_path)
@@ -311,7 +312,10 @@ class StreamLog(logging.StreamHandler):
 
 def colourLog(name='', config=None):
     '''Call this to initiate CustomLog'''
-    custom_color_map = config['color_map']
+    try:
+        custom_color_map = config['color_map']
+    except KeyError:
+        pass
     logging_config = config['logging_config']
     ## pushing directly to root logger, ideally we would want to log
     ## per function / class call but that is just too much code to modify for now
@@ -320,41 +324,46 @@ def colourLog(name='', config=None):
         try:
             loglevel = logging_config['log_level']
             loglevel = str.upper(loglevel)
-        except:
+        except (KeyError, ValueError, AttributeError):
             ''' loglevel defaults to INFO .. '''
             loglevel = 'INFO'
+
         try:
             logfile_level = logging_config['log_file_level']
             logfile_level = str.upper(logfile_level)
-        except:
+        except (KeyError, ValueError, AttributeError):
             ''' logfile_level defaults to DEBUG .. '''
             logfile_level = 'DEBUG'
+
         try:
             logfile = logging_config['log_file']
             log_path, log_file = os.path.split(logfile)
-            time_stamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M:%S")
-            log_file = name + '_' + time_stamp + '_' + log_file
+            time_stamp = datetime.utcnow().strftime("%Y-%m-%d_%H:%M")
+            log_file = time_stamp + '_' + name + '_' + log_file
             logfile = os.path.join(log_path, log_file)
+            print ("Logging to: {}".format(logfile))
+        except (KeyError, ValueError, AttributeError):
+            ''' probably log_file key is missing '''
+            print ("skipping log file ...")
+
+        try:
             if not os.path.exists(log_path):
                 os.makedirs(log_path)
-            try:
-                file_handler = logging.FileHandler(logfile)
-                file_style = CustomLog(name,
-                                       'disable_color',
-                                       '%(pathname)s - %(funcName)s - line:%(lineno)d :: %(asctime)s :: %(levelname)s :: %(message)s')
-                file_handler.setFormatter(file_style)
-                # file_handler.addFilter(LevelFilter(logfile_level))
-                file_handler.setLevel(logfile_level)
-                logger.addHandler(file_handler)
-            except:
-                ''' we dont really care, -- just skip the logging file method entirely'''
-                print ("Unexpected error:", sys.exc_info()[0])
-                print ("skipping log file ...")
+        except (OSError):
+            ''' its fine we can ignore this . '''
+            print ("Please Make sure you have write access to: %s :: skipping log path creation..." % log_path)
+
+        try:
+            file_handler = logging.FileHandler(logfile)
+            file_style = CustomLog(name,
+                                   'disable_color',
+                                   '%(pathname)s - %(funcName)s - line:%(lineno)d :: %(asctime)s :: %(levelname)s :: %(message)s')
+            file_handler.setFormatter(file_style)
+            # file_handler.addFilter(LevelFilter(logfile_level))
+            file_handler.setLevel(logfile_level)
+            logger.addHandler(file_handler)
         except:
-            ''' could match exact exceptions, but probably log_file key is missing '''
-            ''' its fine we ignore this if log_file isnt defined. '''
-            print ("Unexpected error:", sys.exc_info()[0])
-            print ("skipping log file ...")
+            ''' we dont really care, -- just skip the logging file method entirely'''
 
     logger.setLevel(loglevel)
     stream_handler = logging.StreamHandler()
@@ -363,7 +372,7 @@ def colourLog(name='', config=None):
     stream_handler.setFormatter(stream_style)
     logger.addHandler(stream_handler)
     ## this logger object can on other tools or even later in this tool be used to log each individual
-    ## function or class logging call, for now the root logger is used -- it works and its pretty clean.
+    ## function or class logging call, for now the root logger is used - it works, but not clean..
     return logger
 
 
@@ -391,4 +400,3 @@ def colourStream(loglevel='', logfile=''):
     stream_handler.setFormatter(format_style)
     write.addHandler(stream_handler)
     return write
-

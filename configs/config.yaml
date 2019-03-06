@@ -1,7 +1,6 @@
 ---
 ## Central Yaml Config file
 # This pulls in all of the various config elements to create a unified data dictionary used within this tool
-
 config_path: '/etc/gauth'
 temp_path: '/tmp/gauth'
 
@@ -15,4 +14,33 @@ logging_config:
 # The various generic config files, required to make most of the libs work correctly
 color_map: '/etc/gauth/color_map.yaml'
 git_config: '/etc/gauth/git_config.yaml'
+
+## ldap servers must be assigned in an array
+ldap_config:
+    - server: ""
+      use_ssl: ""
+      bind_dn: ""
+      search_base: ""
+      bind_pass: ""
+      ## This can be used in the future for self-signed certs / cert verification
+      ssl_cert:  ""
+      ssl_ca: ""
+      ssl_key: ""
+    - server: ""
+      use_ssl: ""
+      bind_dn: ""
+      search_base: ""
+      bind_pass: ""
+      ## This can be used in the future for self-signed certs / cert verification
+      ssl_cert:  ""
+      ssl_ca: ""
+      ssl_key: ""
+
+email_config:
+  mail_from: ""
+  mail_server: "127.0.0.1"
+
+qr_config:
+  file_store: "/var/gauth"
+
 

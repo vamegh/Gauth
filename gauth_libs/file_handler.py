@@ -13,68 +13,141 @@
 ##########################################################################
 ##
 #
+import os
 import sys
-import yaml
+
+try:
+    from ruamel import yaml
+except:
+    import yaml
 import json
 import logging
 
 
-class FileHandle(object):
+class FileHandler(object):
+    def __init__(self):
+        self.config_file = ''
+        self.data = ''
+        self.yaml_types = ["yaml", "yml", "yl"]
+        self.json_types = ["json", "jsn", "js", "jn"]
+        self.prop_types = ["bash", "properties", "property", "prop", "sh"]
 
-    def __init__(self, options, parser):
-        self.options = options
-        self.parser = parser
+    def make_dir(self, path=None):
+        file_path, file_name = os.path.split(path)
 
-    def read_yaml(self, input_file=''):
+        if file_path:
+            if not os.path.exists(file_path):
+                logging.info("Creating Directory: %s", file_path)
+                os.makedirs(file_path)
+
+    def read_yaml(self, file_type=None):
+        if not file_type:
+            try:
+                file_type = self.config_file.split('.')[-1].lower()
+            except (TypeError, AttributeError, IOError, KeyError) as err:
+                logging.warn("Cannot properly determine file Extension: Error: %s", str(err))
+
+        if file_type not in self.yaml_types:
+            return False
+
         try:
-            with open(input_file, "r") as config:
+            with open(self.config_file, "r") as config:
                 yaml_data = yaml.safe_load(config)
+            print ("Returning yaml_data: %s" % (yaml_data))
             return yaml_data
         except (TypeError, IOError) as err:
+            print("Skipping Yaml Import for: {}".format(self.config_file))
             pass
         return False
 
-    def read_json(self, input_file=''):
+    def read_json(self, file_type=None):
+        if not file_type:
+            try:
+                file_type = self.config_file.split('.')[-1].lower()
+            except (TypeError, AttributeError, IOError, KeyError):
+                logging.warn("Cannot properly determine file Extension: Error: %s", str(err))
+
+        if file_type not in self.json_types:
+            return False
+
         try:
-            with open(input_file, "r") as config:
+            with open(self.config_file, "r") as config:
                 json_data = json.loads(config)
+            print "Returning json_data"
             return json_data
         except (TypeError, IOError) as err:
+            print("Skipping Json Import For: {}".format(self.config_file))
             pass
         return False
 
-    def read_properties(self, input_file=''):
+    def read_properties(self, file_type=None):
+        if not file_type:
+            try:
+                file_type = self.config_file.split('.')[-1].lower()
+            except (TypeError, AttributeError, IOError, KeyError):
+                logging.warn("Cannot properly determine file Extension: Error: %s", str(err))
+
+        if file_type not in self.prop_types:
+            return False
+
         data = {}
+        values = []
         try:
-            with open(input_file, "r") as config:
+            with open(self.config_file, "r") as config:
                 for line in config:
                     if line.startswith('#'):
                         continue
+                    if len(line.strip()) == 0:
+                        continue
+                    if line.startswith('export'):
+                        line = line.split(' ', 1)[1]
                     line = line.split('#', 1)[0]
                     line = line.rstrip()
-                    print("%s\n" % (line))
-                    key, value = line.split("=")
+                    values = line.split("=")
+                    if len(values) > 2:
+                        key = values.pop(0)
+                        value = '='.join(values)
+                    elif len(values) == 2:
+                        key, value = line.split("=")
+                    else:
+                        print ("I cannot parse the following line: {}, from file: {} :: Skipping it".format(line,
+                                                                                                            self.config_file))
+                        continue
+                    if key.startswith('\'') and key.endswith('\''):
+                        key = key[1:]
+                        key = key[:-1]
+                    if key.startswith('\"') and key.endswith('\"'):
+                        key = key[1:]
+                        key = key[:-1]
+                    if value.startswith('\'') and value.endswith('\''):
+                        value = value[1:]
+                        value = value[:-1]
+                    if value.startswith('\"') and value.endswith('\"'):
+                        value = value[1:]
+                        value = value[:-1]
                     data[key] = value
             return data
         except (TypeError, IOError) as err:
             pass
         return False
 
-    def read_file(self, input_file=''):
-        config_data = self.read_yaml(input_file=input_file)
+    def read_file(self, config_file=None, file_type=None):
+        self.config_file = config_file
+        file_type = file_type.lower()
+        config_data = self.read_yaml(file_type=file_type)
         if not config_data:
-            config_data = self.read_json(input_file=input_file)
+            config_data = self.read_json(file_type=file_type)
         if not config_data:
-            config_data = self.read_properties(input_file=input_file)
+            config_data = self.read_properties(file_type=file_type)
         if not config_data:
-            print("Error Cannot Read Config File: {} ... Aborting".format(input_file))
-            sys.exit(1)
+            raise ValueError("Error Cannot Read Config File: {} ... Aborting".format(config_file))
         return config_data
 
     def write_yaml(self, output_file=None, data=None):
         if not output_file or not data:
-            logging.error("Error Data / Output file Not Provided")
+            logging.error("Error Data / Output File Not Provided")
             sys.exit(1)
+        self.make_dir(path=output_file)
         with open(output_file, 'w') as output_file:
             output_file.write(yaml.safe_dump(data, default_flow_style=False,
                                              allow_unicode=True, encoding=None,
@@ -82,15 +155,43 @@ class FileHandle(object):
 
     def write_json(self, output_file=None, data=None):
         if not output_file or not data:
-            logging.error("Error Data / Output file Not Provided")
+            logging.error("Error Data / Output File Not Provided")
             sys.exit(1)
+        self.make_dir(path=output_file)
         with open(output_file, 'w') as output_file:
             json.dump(data, output_file, indent=4)
 
+    def write_tf_properties(self, output_file=None, data=None):
+        if not output_file or not data:
+            logging.error("Error Data / Output File Not Provided")
+            sys.exit(1)
+        self.make_dir(path=output_file)
+        with open(output_file, 'w') as output_file:
+            for key, value in data.items():
+                output_file.write("%s = \"%s\"\n" % (key, value))
+
     def write_properties(self, output_file=None, data=None):
         if not output_file or not data:
-            logging.error("Error Data / Output file Not Provided")
+            logging.error("Error Data / Output File Not Provided")
             sys.exit(1)
-        with open(output_file, 'w') as outfile:
+        self.make_dir(path=output_file)
+        with open(output_file, 'w') as output_file:
             for key, value in data.items():
                 output_file.write("%s=%s\n" % (key, value))
+
+    def write_file(self, output_file=None, data=None, status=None, mode="w"):
+        if not output_file or not data:
+            logging.error("Error Data / Output File Not Provided")
+            sys.exit(1)
+        self.make_dir(path=output_file)
+        with open(output_file, mode) as output_file:
+            if isinstance(data, list):
+                for value in data:
+                    if status == "enable":
+                        output_file.write("+%s\n" % (value))
+                    elif status == "disable":
+                        output_file.write("-%s\n" % (value))
+                    else:
+                        output_file.write("%s\n" % (value))
+            else:
+                output_file.write("%s\n" % (data))
